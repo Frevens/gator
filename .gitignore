@@ -1,0 +1,17 @@
+# Binaries
+gator
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go coverage
+*.out
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
