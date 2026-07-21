@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
+    
 	"github.com/Frevens/gator/internal/database"
 	"github.com/google/uuid"
 )
@@ -30,6 +30,63 @@ func (c *commands) run(s *state, cmd command) error {
 
 	return handler(s, cmd)
 }
+
+func handlerFollow(s *state, cmd command, user database.User) error {
+    // 1. Define context first so it's available for all DB calls
+    ctx := context.Background()
+
+    // 2. Validate input
+    if len(cmd.args) != 1 {
+        return errors.New("follow requires a feed URL")
+    }
+    url := cmd.args[0]
+
+    // 3. Get the feed
+    feed, err := s.db.GetFeedByURL(ctx, url)
+    if err != nil {
+        return err
+    }
+
+    // Current user managed by a middleware
+
+
+    // 5. Create the follow record
+    // Note: CreateFeedFollowParams is a struct TYPE. We create an INSTANCE using {...}
+    follow, err := s.db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+    ID:        uuid.New(),
+    UserID:    user.ID,
+    FeedID:    feed.ID,
+    CreatedAt: time.Now(),
+    UpdatedAt: time.Now(),
+})
+    if err != nil {
+        return err
+    }
+
+    // 6. Success output
+    // Use %+v to print struct fields, or access specific fields like feed.Name
+    fmt.Printf("Followed Feed: %s\nUser: %s\n", follow.FeedName, follow.UserName)
+    
+    return nil
+}   
+
+func handlerFollowing(s *state, cmd command, user database.User) error {
+    ctx := context.Background()
+
+    // Current user managed by a middleware
+
+    follows, err := s.db.GetFeedFollowsForUser(ctx, user.ID)
+    if err != nil {
+        return err
+    }
+
+    for _, follow := range follows {
+        fmt.Println(follow.FeedName)
+    }
+
+    return nil
+}
+
 func handlerAgg(s *state, cmd command) error {
     feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
     if err != nil {
@@ -39,16 +96,13 @@ func handlerAgg(s *state, cmd command) error {
     fmt.Printf("%+v\n", feed)
     return nil
 }
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
     if len(cmd.args) < 2 {
         return errors.New("feed name and url required")
     }
     ctx := context.Background()
 
-    user, err := s.db.GetUser(ctx, s.cfg.CurrentUserName)
-    if err != nil {
-        return err
-    }
+    // Current user managed by a middleware
 
     feed, err := s.db.CreateFeed(ctx, database.CreateFeedParams{
         ID:        uuid.New(),
@@ -62,9 +116,37 @@ func handlerAddFeed(s *state, cmd command) error {
         return err
     }
 
+    _, err = s.db.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+        ID:        uuid.New(),
+        UserID:    user.ID,
+        FeedID:    feed.ID,
+        CreatedAt: time.Now(),
+        UpdatedAt: time.Now(),
+    })
+    if err != nil {
+        return err
+    }
+
     fmt.Printf("%+v\n", feed)
     return nil
 }
+
+func handlerFeeds(s *state, cmd command) error {
+    feeds, err := s.db.ListFeeds(context.Background())
+    if err != nil {
+        return err
+    }
+    for _,feed := range feeds {
+        fmt.Printf("Feed: %s\nURL: %s\nCreated by: %s\n\n",
+        feed.FeedName,
+        feed.FeedUrl,
+        feed.UserName,
+        )
+    }
+    
+    return nil
+}
+
 
 func handlerUsers(s *state, cmd command) error {
     users, err := s.db.GetUsers(context.Background())
