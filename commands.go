@@ -47,7 +47,7 @@ func handlerFollow(s *state, cmd command, user database.User) error {
         return err
     }
 
-    // Current user managed by a middleware
+    // 4. Current user managed by a middleware
 
 
     // 5. Create the follow record
@@ -85,6 +85,37 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
     }
 
     return nil
+}
+
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+    // 1. Define context first so it's available for all DB calls
+    ctx := context.Background()
+
+    // 2. Validate input
+    if len(cmd.args) != 1 {
+        return errors.New("follow requires a feed URL")
+    }
+    url := cmd.args[0]
+
+    // 3. Get the feed
+    feed, err := s.db.GetFeedByURL(ctx, url)
+    if err != nil {
+        return err
+    }
+    // 4. Current user managed by a middleware
+    // 5. Delete the follow record
+    err = s.db.DeleteFeedFollow(ctx, database.DeleteFeedFollowParams{
+        UserID: user.ID,
+        FeedID: feed.ID,
+    })
+    if err != nil {
+        return err
+    }
+
+    fmt.Printf("User: %s has unfollowed Feed: %s\n", user.Name, feed.Name)
+    
+    return nil
+
 }
 
 func handlerAgg(s *state, cmd command) error {
